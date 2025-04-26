@@ -1,0 +1,45 @@
+name: C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y make autoconf cmake doxygen
+
+    - name: Build Project
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make
+
+    - name: Run Tests
+      run: ./build/test/unit_test
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Build Project (Windows)
+      run: |
+        mkdir build
+        cd build
+        "C:\Program Files\CMake\bin\cmake.exe" -G "Visual Studio 15 2017 Win64" -DBUILD_LIBTIFF=ON ..
+        "C:\Program Files\CMake\bin\cmake.exe" ..
+        "C:\Program Files\CMake\bin\cmake.exe" --build . --config Release --target ALL_BUILD
