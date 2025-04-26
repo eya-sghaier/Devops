@@ -1,4 +1,4 @@
-name: C++ CI
+name: CI Pipeline
 
 on:
   push:
@@ -9,37 +9,88 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y make autoconf cmake doxygen
+      - name: Install build dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y make autoconf cmake doxygen
 
-    - name: Build Project
-      run: |
-        mkdir build
-        cd build
-        cmake ..
-        make
+      - name: Build project
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+          make
 
-    - name: Run Tests
-      run: ./build/test/unit_test
+  test-linux:
+    runs-on: ubuntu-latest
+    needs: build-linux
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: |
+          chmod +x ./build/test/unit_test
+          ./build/test/unit_test
 
   build-windows:
     runs-on: windows-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Build Project (Windows)
-      run: |
-        mkdir build
-        cd build
-        "C:\Program Files\CMake\bin\cmake.exe" -G "Visual Studio 15 2017 Win64" -DBUILD_LIBTIFF=ON ..
-        "C:\Program Files\CMake\bin\cmake.exe" ..
-        "C:\Program Files\CMake\bin\cmake.exe" --build . --config Release --target ALL_BUILD
+      - name: Build project with CMake
+        run: |
+          mkdir build
+          cd build
+          "C:\Program Files\CMake\bin\cmake.exe" -G "Visual Studio 15 2017 Win64" -DBUILD_LIBTIFF=ON ..
+          "C:\Program Files\CMake\bin\cmake.exe" ..
+          "C:\Program Files\CMake\bin\cmake.exe" --build . --config Release --target ALL_BUILD
+
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: build-linux
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t your_dockerhub_username/your-image-name:latest .
+          docker push your_dockerhub_username/your-image-name:latest
+
+  generate-docs:
+    runs-on: ubuntu-latest
+    needs: build-linux
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: |
+          sudo apt update
+          sudo apt install -y doxygen
+
+      - name: Generate Documentation
+        run: |
+          doxygen Doxyfile
+
+      - name: Upload Documentation
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./docs/html
